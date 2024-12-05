@@ -1,0 +1,261 @@
+openapi: 3.0.3
+info:
+  title: Banking Reports API
+  description: API for generating banking reports
+  version: 1.0.0
+servers:
+  - url: http://localhost:8088/api/v1
+    description: Local development server
+paths:
+  /reports/customers/{customerId}/average-balances:
+    get:
+      tags:
+        - Report
+      summary: Get customer's daily average balances
+      operationId: getCustomerAverageBalances
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: "2024-03"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyBalanceReportDto'
+        '404':
+          description: Client not found
+        '400':
+          description: Invalid input
+  /reports/commissions:
+    get:
+      tags:
+        - Report
+      summary: Get commissions report
+      operationId: getCommissionsReport
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommissionReportDto'
+        '400':
+          description: Invalid date range
+components:
+  schemas:
+    DailyBalanceReportDto:
+      type: object
+      description: Reporte de saldos diarios y promedio de un cliente
+      properties:
+        customerId:
+          type: string
+          description: Identificador único del cliente
+        customerName:
+          type: string
+          description: Nombre del cliente
+        customerType:
+          type: string
+          description: tipo de cliente
+        month:
+          type: string
+          format: date
+          description: Mes para el cual se genera el reporte (YYYY-MM)
+        accounts:
+          type: object
+          description: Agrupación de cuentas por tipo (ahorro, corriente, plazo fijo, vip, pyme)
+          properties:
+            savings:
+              type: array
+              description: Lista de cuentas de ahorro del cliente
+              items:
+                $ref: '#/components/schemas/AccountBalanceDto'
+            checking:
+              type: array
+              description: Lista de cuentas corrientes del cliente
+              items:
+                $ref: '#/components/schemas/AccountBalanceDto'
+            fixedTerm:
+              type: array
+              description: Lista de cuentas de plazo fijo del cliente
+              items:
+                $ref: '#/components/schemas/AccountBalanceDto'
+            savingsVip:
+              type: array
+              description: Lista de cuentas de ahorro VIP del cliente
+              items:
+                $ref: '#/components/schemas/AccountBalanceDto'
+            checkingPyme:
+              type: array
+              description: Lista de cuentas corrientes PYME del cliente
+              items:
+                $ref: '#/components/schemas/AccountBalanceDto'
+        credits:
+          type: object
+          description: Agrupación de productos crediticios por tipo
+          properties:
+            credits:
+              type: array
+              description: Lista de créditos del cliente
+              items:
+                $ref: '#/components/schemas/CreditBalanceDto'
+            creditCards:
+              type: array
+              description: Lista de tarjetas de crédito del cliente
+              items:
+                $ref: '#/components/schemas/CreditBalanceDto'
+        totalAverageBalance:
+          type: number
+          description: Saldo promedio total considerando todos los productos del cliente
+
+    AccountBalanceDto:
+      type: object
+      description: Información de saldos de una cuenta específica
+      properties:
+        accountId:
+          type: string
+          description: Identificador único de la cuenta
+        accountType:
+          type: string
+          enum: [SAVINGS, CHECKING, FIXED_TERM, SAVINGS_VIP, CHECKING_PYME]
+          description: Tipo de cuenta (Ahorro, Corriente, Plazo Fijo, AhorroVIP, CorrientePYME)
+        dailyBalances:
+          type: array
+          description: Lista de saldos diarios de la cuenta
+          items:
+            $ref: '#/components/schemas/DailyBalanceDto'
+        averageBalance:
+          type: number
+          description: Saldo promedio de la cuenta en el período consultado
+
+    CreditBalanceDto:
+      type: object
+      description: Información de saldos de un producto crediticio
+      properties:
+        creditId:
+          type: string
+          description: Identificador único del crédito
+        creditType:
+          type: string
+          enum: [PERSONAL, BUSINESS, CREDIT_CARD]
+          description: Tipo de crédito (préstamo personal, empresarial o tarjeta de crédito)
+        dailyBalances:
+          type: array
+          description: Lista de saldos diarios del crédito
+          items:
+            $ref: '#/components/schemas/DailyBalanceDto'
+        averageBalance:
+          type: number
+          description: Saldo promedio del crédito en el período consultado
+
+    DailyBalanceDto:
+      type: object
+      description: Registro del saldo de un producto en un día específico
+      properties:
+        balanceDate:
+          type: string
+          format: date
+          description: Fecha del registro del saldo
+        balanceAmount:
+          type: number
+          description: Saldo del producto en la fecha especificada
+
+    CommissionReportDto:
+      type: object
+      description: Reporte de comisiones cobradas por producto en un período
+      properties:
+        startDate:
+          type: string
+          format: date
+          description: Fecha inicial del período del reporte
+        endDate:
+          type: string
+          format: date
+          description: Fecha final del período del reporte
+        commissions:
+          type: object
+          description: Agrupación de comisiones por tipo de producto
+          properties:
+            accounts:
+              type: array
+              description: Lista de comisiones de cuentas bancarias
+              items:
+                $ref: '#/components/schemas/ProductCommissionDto'
+            credits:
+              type: array
+              description: Lista de comisiones de productos crediticios
+              items:
+                $ref: '#/components/schemas/ProductCommissionDto'
+        totalCommissionsAmount:
+          type: number
+          description: Monto total de comisiones cobradas en el período
+        totalProducts:
+          type: integer
+          description: Número total de productos que generaron comisiones
+
+    ProductCommissionDto:
+      type: object
+      description: Detalle de comisiones cobradas a un producto específico
+      properties:
+        productId:
+          type: string
+          description: Identificador único del producto
+        productType:
+          type: string
+          description: Tipo de producto (cuenta o crédito)
+        customerId:
+          type: string
+          description: Identificador del cliente dueño del producto
+        customerName:
+          type: string
+          description: Nombre del cliente dueño del producto
+        commissionDetails:
+          type: array
+          description: Lista detallada de las comisiones cobradas
+          items:
+            $ref: '#/components/schemas/CommissionDetailDto'
+        totalCommissions:
+          type: number
+          description: Suma total de comisiones cobradas al producto
+
+    CommissionDetailDto:
+      type: object
+      description: Detalle de una comisión específica
+      properties:
+        date:
+          type: string
+          format: date
+          description: Fecha en que se cobró la comisión
+        type:
+          type: string
+          enum: [MAINTENANCE_FEE, TRANSACTION_EXCESS, LATE_PAYMENT]
+          description: Tipo de comisión (mantenimiento, exceso de transacciones, pago tardío)
+        amount:
+          type: number
+          description: Monto de la comisión cobrada
+        description:
+          type: string
+          description: Descripción detallada del motivo de la comisión
