@@ -4,26 +4,30 @@ import com.bm_nttdata.report_ms.client.AccountClient;
 import com.bm_nttdata.report_ms.client.CreditClient;
 import com.bm_nttdata.report_ms.client.CustomerClient;
 import com.bm_nttdata.report_ms.dto.AccountDto;
+import com.bm_nttdata.report_ms.dto.CreditCardDto;
 import com.bm_nttdata.report_ms.dto.CreditDto;
 import com.bm_nttdata.report_ms.dto.CustomerDto;
-import com.bm_nttdata.report_ms.exception.BusinessRuleException;
 import com.bm_nttdata.report_ms.exception.ServiceException;
-import com.bm_nttdata.report_ms.model.*;
+import com.bm_nttdata.report_ms.model.AccountBalanceDto;
+import com.bm_nttdata.report_ms.model.CreditBalanceDto;
+import com.bm_nttdata.report_ms.model.CreditCardBalanceDto;
+import com.bm_nttdata.report_ms.model.DailyBalanceDto;
+import com.bm_nttdata.report_ms.model.DailyBalanceReportDto;
+import com.bm_nttdata.report_ms.model.DailyBalanceReportDtoAccounts;
+import com.bm_nttdata.report_ms.model.DailyBalanceReportDtoCredits;
 import com.bm_nttdata.report_ms.service.ReportService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * ReportServiceImpl.
+ * Implementación de los servicios de generación de reportes bancarios.
+ * Maneja el procesamiento de cuentas bancarias, créditos y tarjetas de crédito
+ * para generar reportes consolidados de saldos diarios.
  */
 @Slf4j
 @Service
@@ -36,78 +40,85 @@ public class ReportServiceImpl implements ReportService {
 //    private final TransactionClient transactionClient;
 
     /**
-     * generateDailyBalanceReport.
+     * Genera un reporte de balance diario para un cliente específico en un mes determinado.
+     * El reporte incluye información detallada sobre todas las cuentas, créditos y tarjetas
+     * de crédito del cliente.
      *
-     * @param clientId rr
-     * @param month rr
-     * @return rr
+     * @param clientId Identificador único del cliente
+     * @param month Mes para el cual se generará el reporte
+     * @return DailyBalanceReportDto Objeto que contiene el reporte completo de balances
+     * @throws ServiceException Si ocurre algún error durante la generación del reporte
      */
     @Override
     public DailyBalanceReportDto generateDailyBalanceReport(String clientId, LocalDate month) {
-        // Get customer data
-        CustomerDto customer = customerClient.getCustomerById(clientId);
 
-        // Get all accounts and credits
-        List<AccountDto> accounts = accountClient.getCustomerAccounts(clientId);
-        List<CreditDto> credits = creditClient.getCustomerCredits(clientId);
-        /*List<CreditCardDto> creditCards = creditClient.getCustomerCreditCards(clientId);*/
+        try {
+            CustomerDto customer = customerClient.getCustomerById(clientId);
+            List<AccountDto> accounts = accountClient.getCustomerAccounts(clientId);
+            List<CreditDto> credits = creditClient.getCustomerCredits(clientId);
+            List<CreditCardDto> creditCards = creditClient.getCustomerCreditCards(clientId);
+            log.info("Customer: " + customer);
+            log.info("Accounts: " + accounts);
+            log.info("Credits: " + credits);
+            log.info("CreditCards: " + creditCards);
 
-        // Calculate daily balances for the entire month
-        YearMonth yearMonth = YearMonth.from(month);
-        LocalDate startDate = yearMonth.atDay(1);
-        LocalDate endDate = yearMonth.atEndOfMonth();
+            DailyBalanceReportDto report = new DailyBalanceReportDto();
+            report.setCustomerId(clientId);
+            report.setCustomerName(customer.getName());
+            report.setCustomerType(customer.getCustomerType());
+            report.setMonth(month);
 
-        // Initialize report
-        DailyBalanceReportDto report = new DailyBalanceReportDto();
-        report.setCustomerId(clientId);
-        report.setCustomerName(customer.getName());
-        report.setCustomerType(customer.getCustomerType());
-        report.setMonth(month);
 
-        log.info("Accounts: " + accounts);
-        // Process accounts
-        DailyBalanceReportDtoAccounts accountBalances = new DailyBalanceReportDtoAccounts();
-        accountBalances.setSavings(
-                calculateAccountBalances(
-                        accounts, AccountBalanceDto.AccountTypeEnum.SAVINGS, month)); // put("savings", calculateAccountBalances(accounts, "SAVINGS", startDate, endDate, month));
-        accountBalances.setChecking(
-                calculateAccountBalances(
-                        accounts, AccountBalanceDto.AccountTypeEnum.CHECKING, month));
-        accountBalances.setFixedTerm(
-                calculateAccountBalances(
-                        accounts, AccountBalanceDto.AccountTypeEnum.FIXED_TERM, month));
-        accountBalances.setSavingsVip(
-                calculateAccountBalances(
-                        accounts, AccountBalanceDto.AccountTypeEnum.SAVINGS_VIP, month));
-        accountBalances.setCheckingPyme(
-                calculateAccountBalances(
-                        accounts, AccountBalanceDto.AccountTypeEnum.CHECKING_PYME, month));
-        report.setAccounts(accountBalances);
+            DailyBalanceReportDtoAccounts accountBalances = new DailyBalanceReportDtoAccounts();
+            accountBalances.setSavings(
+                    calculateAccountBalances(
+                            accounts, AccountBalanceDto.AccountTypeEnum.SAVINGS, month));
+            accountBalances.setChecking(
+                    calculateAccountBalances(
+                            accounts, AccountBalanceDto.AccountTypeEnum.CHECKING, month));
+            accountBalances.setFixedTerm(
+                    calculateAccountBalances(
+                            accounts, AccountBalanceDto.AccountTypeEnum.FIXED_TERM, month));
+            accountBalances.setSavingsVip(
+                    calculateAccountBalances(
+                            accounts, AccountBalanceDto.AccountTypeEnum.SAVINGS_VIP, month));
+            accountBalances.setCheckingPyme(
+                    calculateAccountBalances(
+                            accounts, AccountBalanceDto.AccountTypeEnum.CHECKING_PYME, month));
+            report.setAccounts(accountBalances);
 
-        // Process credits
-        DailyBalanceReportDtoCredits creditBalances = new DailyBalanceReportDtoCredits();
-        creditBalances.setCredits(calculateCreditBalances(credits, "CREDIT", month));
-        creditBalances.setCreditCards(calculateCreditBalances(credits, "CREDIT_CARD", month));
+            // Process credits
+            DailyBalanceReportDtoCredits creditBalances = new DailyBalanceReportDtoCredits();
+            creditBalances.setCredits(calculateCreditBalances(credits, month));
+            creditBalances.setCreditCards(calculateCreditCardBalances(creditCards, month));
 
-        report.setCredits(creditBalances);
+            report.setCredits(creditBalances);
 
-        /*// Calculate total average
-        double totalAverage = calculateTotalAverageBalance(accountBalances, creditBalances);
-        report.setTotalAverageBalance(totalAverage);*/
-
-        return report;
+            return report;
+        } catch (Exception e) {
+            log.error(
+                    "Unexpected error while generating balance report: {}: " + e.getMessage());
+            throw new ServiceException(
+                    "Unexpected error while generating balance report: " + e.getMessage());
+        }
     }
 
     /**
-     * calculateAccountBalances.
+     * Calcula los saldos diarios para un tipo específico de cuenta bancaria.
+     * Procesa todas las cuentas del cliente del tipo especificado y calcula
+     * el saldo promedio diario para el período.
      *
-     * @param accounts accounts
-     * @param accountType rr
-     * @param month rr
-     * @return datos
+     * @param accounts Lista de cuentas del cliente
+     * @param accountType Tipo de cuenta a procesar
+     * @param month Mes para el cual se calculan los balances
+     * @return Lista de saldos promedio diario para cada cuenta del tipo especificado
+     * @throws ServiceException Si ocurre un error durante el cálculo de los saldos
      */
     private List<AccountBalanceDto> calculateAccountBalances(
-            List<AccountDto> accounts, AccountBalanceDto.AccountTypeEnum accountType, LocalDate month) {
+            List<AccountDto> accounts,
+            AccountBalanceDto.AccountTypeEnum accountType,
+            LocalDate month) {
+
         try {
             List<AccountBalanceDto> accountBalanceDtoList = accounts.stream()
                     .filter(account -> account.getAccountType().equals(accountType.getValue()))
@@ -115,7 +126,6 @@ public class ReportServiceImpl implements ReportService {
                         AccountBalanceDto balance = new AccountBalanceDto();
                         balance.setAccountId(account.getId());
                         balance.setAccountType(accountType);
-
 
                         List<DailyBalanceDto> dailyBalances =
                                 accountClient.getAllDailyBalances(account.getId(), month);
@@ -135,56 +145,108 @@ public class ReportServiceImpl implements ReportService {
 
             return accountBalanceDtoList;
         } catch (Exception e) {
-            log.error("Unexpected error: " + e.getMessage());
-            throw new ServiceException("Unexpected error: " + e.getMessage());
+            log.error(
+                    "Unexpected error while getting daily account balances: {}: " + e.getMessage());
+            throw new ServiceException(
+                    "Unexpected error while getting daily account balances: " + e.getMessage());
         }
     }
 
     /**
-     * calculateCreditBalances.
+     * Calcula los saldos diarios para los créditos del cliente.
+     * Procesa todos los créditos y calcula el saldo promedio diario
+     * junto con otra información relevante del crédito.
      *
-     * @param credits accounts
-     * @param month rr
-     * @return datos
+     * @param credits Lista de créditos del cliente
+     * @param month Mes para el cual se calculan los balances
+     * @return Lista de saldos promedio diario para cada crédito
+     * @throws ServiceException Si ocurre un error durante el cálculo de los saldos
      */
     private List<CreditBalanceDto> calculateCreditBalances(
-            List<CreditDto> credits, String creditType, LocalDate month) {
+            List<CreditDto> credits, LocalDate month) {
 
-        List<CreditBalanceDto> accountBalanceDtoList = credits.stream()
-                .map(account -> {
-                    CreditBalanceDto balance = new CreditBalanceDto();
-                    balance.setCreditId(account.getId());
-                    balance.setCreditType(CreditBalanceDto.CreditTypeEnum.valueOf(account.getCreditType()));
+        try {
+            List<CreditBalanceDto> creditBalanceDtoList = credits.stream()
+                    .map(credit -> {
+                        CreditBalanceDto balance = new CreditBalanceDto();
+                        balance.setCreditId(credit.getId());
+                        balance.setCreditType(credit.getCreditType());
+                        balance.setTotalCreditAmount(credit.getAmount());
+                        balance.setCreditOutstandingBalance(credit.getBalance());
 
-                    List<DailyBalanceDto> creditDailyBalances;
+                        List<DailyBalanceDto> creditDailyBalances =
+                                creditClient.getAllCreditDailyBalances(credit.getId(), month);
 
-                    switch (creditType) {
-                        case "CREDIT" -> {
-                            creditDailyBalances =
-                                    creditClient.getAllCreditDailyBalances(account.getId(), month);
-                        }
-                        case "CREDIT_CARD" -> {
-                            creditDailyBalances =
-                                    creditClient.getAllCreditCardDailyBalances(account.getId(), month);
-                        }
-                        default ->
-                                throw new BusinessRuleException("Unknown product type");
-                    }
+                        BigDecimal totalBalance = creditDailyBalances.stream()
+                                .map(DailyBalanceDto::getBalanceAmount)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                    BigDecimal totalBalance = creditDailyBalances.stream()
-                            .map(DailyBalanceDto::getBalanceAmount)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                        int days = creditDailyBalances.size();
+                        log.info("totalBalance: " + totalBalance + " - days: " + days);
+                        balance.setDailyBalances(creditDailyBalances);
+                        balance.setAverageDailyBalance(
+                                totalBalance.divide(BigDecimal.valueOf(days)));
 
-                    int days = creditDailyBalances.size();
-                    log.info("totalBalance: " + totalBalance + " - days: " + days);
-                    balance.setDailyBalances(creditDailyBalances);
-                    balance.setAverageBalance(totalBalance.divide(BigDecimal.valueOf(days)));
+                        return balance;
+                    })
+                    .collect(Collectors.toList());
 
-                    return balance;
-                })
-                .collect(Collectors.toList());
-
-        return accountBalanceDtoList;
+            return creditBalanceDtoList;
+        } catch (Exception e) {
+            log.error(
+                    "Unexpected error while getting daily credit balances: {}", e.getMessage());
+            throw new ServiceException(
+                    "Unexpected error while getting daily credit balances" + e.getMessage());
+        }
     }
 
+    /**
+     * Calcula los saldos diarios para las tarjetas de crédito del cliente.
+     * Procesa todas las tarjetas de crédito y calcula el saldo promedio diario,
+     * incluyendo información sobre límites de crédito y crédito disponible.
+     *
+     * @param creditCards Lista de tarjetas de crédito del cliente
+     * @param month Mes para el cual se calculan los saldos
+     * @return Lista de saldos promedio diario para cada tarjeta de crédito
+     * @throws ServiceException Si ocurre un error durante el cálculo de los saldos
+     */
+    private List<CreditCardBalanceDto> calculateCreditCardBalances(
+            List<CreditCardDto> creditCards, LocalDate month) {
+        try {
+            List<CreditCardBalanceDto> creditCardBalanceDtoList = creditCards.stream()
+                    .map(creditCard -> {
+                        CreditCardBalanceDto balance = new CreditCardBalanceDto();
+                        balance.setCreditCardId(creditCard.getId());
+                        balance.setCreditCardType(creditCard.getCardType());
+                        balance.setCardNumber(creditCard.getCardNumber());
+                        balance.setCreditCardLimit(creditCard.getCreditLimit());
+                        balance.setAvailableCredit(creditCard.getAvailableCredit());
+
+                        List<DailyBalanceDto> cardDailyBalances =
+                                creditClient.getAllCreditCardDailyBalances(
+                                        creditCard.getId(), month);
+
+                        BigDecimal totalBalance = cardDailyBalances.stream()
+                                .map(DailyBalanceDto::getBalanceAmount)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                        int days = cardDailyBalances.size();
+                        log.info("totalBalance: " + totalBalance + " - days: " + days);
+                        balance.setDailyBalances(cardDailyBalances);
+                        balance.setAverageDailyBalance(
+                                totalBalance.divide(BigDecimal.valueOf(days)));
+
+                        return balance;
+                    })
+                    .collect(Collectors.toList());
+
+            return creditCardBalanceDtoList;
+        } catch (Exception e) {
+            log.error(
+                    "Unexpected error while getting daily credit card balances: {}",
+                    e.getMessage());
+            throw new ServiceException(
+                    "Unexpected error while getting daily credit card balances" + e.getMessage());
+        }
+    }
 }
