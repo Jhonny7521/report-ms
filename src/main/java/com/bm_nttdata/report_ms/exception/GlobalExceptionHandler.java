@@ -16,18 +16,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    //    /**
-    //     * Maneja las excepciones de tipo AccountNotFoundException.
-    //     *
-    //     * @param ex La excepción de cuenta no encontrada
-    //     * @return ResponseEntity con los detalles del error y estado HTTP 404
-    //     */
-    //    @ExceptionHandler(AccountNotFoundException.class)
-    //    public ResponseEntity<Map<String, Object>> handleAccountNotFoundException(
-    //            AccountNotFoundException ex) {
-    //        return createErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "ACCOUNT_NOT_FOUND");
-    //    }
-
     /**
      * Maneja las excepciones de tipo BusinessRuleException.
      *
