@@ -126,10 +126,7 @@ components:
               type: array
               description: Lista de tarjetas de crédito del cliente
               items:
-                $ref: '#/components/schemas/CreditBalanceDto'
-        totalAverageBalance:
-          type: number
-          description: Saldo promedio total considerando todos los productos del cliente
+                $ref: '#/components/schemas/CreditCardBalanceDto'
 
     AccountBalanceDto:
       type: object
@@ -142,6 +139,12 @@ components:
           type: string
           enum: [SAVINGS, CHECKING, FIXED_TERM, SAVINGS_VIP, CHECKING_PYME]
           description: Tipo de cuenta (Ahorro, Corriente, Plazo Fijo, AhorroVIP, CorrientePYME)
+        accountNumber:
+          type: string
+          description: Número de cuenta
+        currentBalance:
+          type: number
+          description: Saldo actual en cuenta
         dailyBalances:
           type: array
           description: Lista de saldos diarios de la cuenta
@@ -160,14 +163,47 @@ components:
           description: Identificador único del crédito
         creditType:
           type: string
-          enum: [PERSONAL, BUSINESS, CREDIT_CARD]
-          description: Tipo de crédito (préstamo personal, empresarial o tarjeta de crédito)
+          description: Tipo de crédito (personal o empresarial)
+        totalCreditAmount:
+          type: number
+          description: Monto total del crédito
+        creditOutstandingBalance:
+          type: number
+          description: Saldo pendiente del crédito
         dailyBalances:
           type: array
           description: Lista de saldos diarios del crédito
           items:
             $ref: '#/components/schemas/DailyBalanceDto'
-        averageBalance:
+        averageDailyBalance:
+          type: number
+          description: Saldo promedio diario del crédito en el período consultado
+
+    CreditCardBalanceDto:
+      type: object
+      description: Información de saldos de un producto crediticio
+      properties:
+        creditCardId:
+          type: string
+          description: Identificador único del crédito
+        CardNumber:
+          type: string
+          description: Número de tarjeta de crédito
+        creditCardType:
+          type: string
+          description: Tipo de tarjeta de crédito (personal o empresarial)
+        creditCardLimit:
+          type: number
+          description: Límite de crédito
+        availableCredit:
+          type: number
+          description: Crédito disponible
+        dailyBalances:
+          type: array
+          description: Lista de saldos diarios del crédito
+          items:
+            $ref: '#/components/schemas/DailyBalanceDto'
+        averageDailyBalance:
           type: number
           description: Saldo promedio del crédito en el período consultado
 

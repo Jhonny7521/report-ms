@@ -3,11 +3,8 @@ package com.bm_nttdata.report_ms.api;
 import com.bm_nttdata.report_ms.model.CommissionReportDto;
 import com.bm_nttdata.report_ms.model.DailyBalanceReportDto;
 import com.bm_nttdata.report_ms.service.ReportService;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -35,10 +32,12 @@ public class ReportApiDelegateImpl implements ReportApiDelegate {
     }
 
     // Fallback methods for circuit breaker
-    private ResponseEntity<DailyBalanceReportDto> getBalanceReportFallback(String clientId, LocalDate month, Exception e) {
+    private ResponseEntity<DailyBalanceReportDto> getBalanceReportFallback(
+            String clientId, LocalDate month, Exception e) {
         log.error("Fallback for balance report. ClientId: {}, Month: {}, Error: {}",
                 clientId, month, e.getMessage());
-        return new ResponseEntity("We are experiencing some errors. Please try again in a few minutes", HttpStatus.OK);
+        return new ResponseEntity(
+                "We are experiencing some errors. Please try again later", HttpStatus.OK);
     }
 
 }

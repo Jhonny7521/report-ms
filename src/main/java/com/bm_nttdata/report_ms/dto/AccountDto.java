@@ -18,11 +18,8 @@ public class AccountDto {
 
     private String id;
     private String customerId;
-    private String clientName;
     private String accountType;
     private String accountNumber;
     private BigDecimal balance;
-    private int currentMovements;
-    private String status;
 
 }

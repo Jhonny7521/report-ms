@@ -1,11 +1,9 @@
 package com.bm_nttdata.report_ms.client;
 
 import com.bm_nttdata.report_ms.dto.AccountDto;
-
+import com.bm_nttdata.report_ms.model.DailyBalanceDto;
 import java.time.LocalDate;
 import java.util.List;
-
-import com.bm_nttdata.report_ms.model.DailyBalanceDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
