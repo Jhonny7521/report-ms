@@ -9,12 +9,16 @@ import com.bm_nttdata.report_ms.dto.CreditDto;
 import com.bm_nttdata.report_ms.dto.CustomerDto;
 import com.bm_nttdata.report_ms.exception.ServiceException;
 import com.bm_nttdata.report_ms.model.AccountBalanceDto;
+import com.bm_nttdata.report_ms.model.AccountFeeDto;
+import com.bm_nttdata.report_ms.model.BankFeeReportDto;
+import com.bm_nttdata.report_ms.model.BankFeeReportDtoAccountFees;
 import com.bm_nttdata.report_ms.model.CreditBalanceDto;
 import com.bm_nttdata.report_ms.model.CreditCardBalanceDto;
 import com.bm_nttdata.report_ms.model.DailyBalanceDto;
 import com.bm_nttdata.report_ms.model.DailyBalanceReportDto;
 import com.bm_nttdata.report_ms.model.DailyBalanceReportDtoAccounts;
 import com.bm_nttdata.report_ms.model.DailyBalanceReportDtoCredits;
+import com.bm_nttdata.report_ms.model.FeeDetailDto;
 import com.bm_nttdata.report_ms.service.ReportService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -100,6 +104,56 @@ public class ReportServiceImpl implements ReportService {
                     "Unexpected error while generating balance report: {}: " + e.getMessage());
             throw new ServiceException(
                     "Unexpected error while generating balance report: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Genera un reporte de comisiones bancarias dentro de un pediodo de tiempo.
+     * El reporte incluye información detallada sobre las comisiones según los tipos de cuentas.
+     *
+     * @param startDate fecha de inicio de la busqueda
+     * @param endDate fecha de fin de la busqueda
+     * @return BankFeeReportDto Objeto que contiene el reporte completo de las comisiones bancarias
+     */
+    @Override
+    public BankFeeReportDto getBankFeesReport(LocalDate startDate, LocalDate endDate) {
+        try {
+            List<AccountDto> accounts = accountClient.getActiveAccounts("ACTIVE");
+
+            BankFeeReportDto report = new BankFeeReportDto();
+            report.setStartDate(startDate);
+            report.setEndDate(endDate);
+
+            BankFeeReportDtoAccountFees accountFees = new BankFeeReportDtoAccountFees();
+            accountFees.setSavings(
+                    calculateAccountFees(
+                        accounts, AccountFeeDto.AccountTypeEnum.SAVINGS, startDate, endDate));
+            accountFees.setChecking(
+                    calculateAccountFees(
+                        accounts, AccountFeeDto.AccountTypeEnum.CHECKING, startDate, endDate));
+            accountFees.setFixedTerm(
+                    calculateAccountFees(
+                        accounts, AccountFeeDto.AccountTypeEnum.FIXED_TERM, startDate, endDate));
+            accountFees.setSavingsVip(
+                    calculateAccountFees(
+                        accounts, AccountFeeDto.AccountTypeEnum.SAVINGS_VIP, startDate, endDate));
+            accountFees.setCheckingPyme(
+                    calculateAccountFees(
+                        accounts, AccountFeeDto.AccountTypeEnum.CHECKING_PYME, startDate, endDate));
+
+            BigDecimal totalFeeAmount = getTotalFeeAmount(accountFees);
+            int totalNumberOfFees = getTotalNumberOfFees(accountFees);
+
+            report.setAccountFees(accountFees);
+            report.setTotalFeesAmount(totalFeeAmount);
+            report.setTotalFeesNumber(totalNumberOfFees);
+
+            return report;
+        } catch (Exception e) {
+            log.error(
+                    "Unexpected error while generating bank fees report: {}: " + e.getMessage());
+            throw new ServiceException(
+                    "Unexpected error while generating bank fees report: " + e.getMessage());
         }
     }
 
@@ -248,5 +302,145 @@ public class ReportServiceImpl implements ReportService {
             throw new ServiceException(
                     "Unexpected error while getting daily credit card balances" + e.getMessage());
         }
+    }
+
+    /**
+     * Calcula las comisiones de cuentas para una lista de cuentas filtrada por
+     * tipo de cuenta y rango de fechas.
+     *
+     * @param accounts Lista de DTOs de cuentas a procesar
+     * @param accountType El tipo de cuenta a filtrar (ej., SAVINGS, CHECKING)
+     * @param startDate La fecha de inicio del período de cálculo de comisiones
+     * @param endDate La fecha de fin del período de cálculo de comisiones
+     * @return Lista de AccountFeeDto con detalles de comisiones para cada cuenta que coincida
+     * @throws ServiceException Si ocurre un error inesperado durante el procesamiento
+     */
+    private List<AccountFeeDto> calculateAccountFees(
+            List<AccountDto> accounts,
+            AccountFeeDto.AccountTypeEnum accountType,
+            LocalDate startDate,
+            LocalDate endDate) {
+
+        try {
+            List<AccountFeeDto> accountFeeDtoList = accounts.stream()
+                    .filter(account -> account.getAccountType().equals(accountType.getValue()))
+                    .map(account -> {
+                        AccountFeeDto accountFee = new AccountFeeDto();
+                        accountFee.setAccountId(account.getId());
+                        accountFee.setAccountType(accountType);
+                        accountFee.setCustomerId(account.getCustomerId());
+
+                        List<FeeDetailDto> feeList =
+                                accountClient.getAllAccountFees(
+                                        account.getId(), startDate, endDate);
+
+                        BigDecimal totalFees = feeList.stream()
+                                .map(FeeDetailDto::getFeeAmount)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                        log.info("totalFee: " + totalFees);
+                        accountFee.feeDetails(feeList);
+                        accountFee.setNumberOfFees(feeList.size());
+                        accountFee.setTotalFees(totalFees);
+
+                        return accountFee;
+                    })
+                    .filter(accountFeeDto -> !accountFeeDto.getFeeDetails().isEmpty())
+                    .collect(Collectors.toList());
+
+            return accountFeeDtoList;
+        } catch (Exception e) {
+            log.error(
+                    "Unexpected error while getting account fees: {}: " + e.getMessage());
+            throw new ServiceException(
+                    "Unexpected error while getting account fees: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Calcula el monto total de comisiones a través de todos los tipos de cuenta en el reporte.
+     * Maneja diferentes tipos de cuenta incluyendo Ahorros, Corriente, Plazo Fijo, Ahorros VIP,
+     * y cuentas Corriente PYME.
+     *
+     * @param accountFees El DTO que contiene listas de comisiones para diferentes tipos de cuenta
+     * @return La suma total de las comisiones a través de todos los tipos de cuenta
+     */
+    private BigDecimal getTotalFeeAmount(BankFeeReportDtoAccountFees accountFees) {
+        BigDecimal totalFeeAmount = BigDecimal.ZERO;
+        totalFeeAmount = totalFeeAmount.add(
+                accountFees.getSavings()
+                        .isEmpty() ? BigDecimal.ZERO : getFeesSum(accountFees.getSavings()));
+        totalFeeAmount = totalFeeAmount.add(
+                accountFees.getChecking()
+                        .isEmpty() ? BigDecimal.ZERO : getFeesSum(accountFees.getChecking()));
+        totalFeeAmount = totalFeeAmount.add(
+                accountFees.getFixedTerm()
+                        .isEmpty() ? BigDecimal.ZERO : getFeesSum(accountFees.getFixedTerm()));
+        totalFeeAmount = totalFeeAmount.add(
+                accountFees.getSavingsVip()
+                        .isEmpty() ? BigDecimal.ZERO : getFeesSum(accountFees.getSavingsVip()));
+        totalFeeAmount = totalFeeAmount.add(
+                accountFees.getCheckingPyme()
+                        .isEmpty() ? BigDecimal.ZERO : getFeesSum(accountFees.getCheckingPyme()));
+        return totalFeeAmount;
+    }
+
+    /**
+     * Calcula la suma de todas las comisiones para una lista específica de comisiones de cuenta.
+     * Este método aplana los detalles de comisiones de todas las cuentas y suma sus montos.
+     *
+     * @param accountFeeList Lista de AccountFeeDto que contiene información de comisiones
+     * @return La suma total de todos los montos de comisiones como BigDecimal
+     */
+    private BigDecimal getFeesSum(List<AccountFeeDto> accountFeeList) {
+
+        return accountFeeList.stream()
+                .flatMap(accountFee -> accountFee.getFeeDetails().stream())
+                .map(FeeDetailDto::getFeeAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                ;
+    }
+
+    /**
+     * Calcula el número total de comisiones a través de todos los tipos de cuenta en el reporte.
+     * Similar a getTotalFeeAmount pero cuenta el número de ocurrencias de comisiones en lugar
+     * de sumar montos.
+     *
+     * @param accountFees El DTO que contiene listas de comisiones para diferentes tipos de cuenta
+     * @return El conteo total de todas las comisiones a través de todos los tipos de cuenta
+     */
+    private int getTotalNumberOfFees(BankFeeReportDtoAccountFees accountFees) {
+        int totalFeesNumber = 0;
+        totalFeesNumber +=
+                accountFees.getSavings()
+                        .isEmpty() ? 0 : getTotalFees(accountFees.getSavings());
+        totalFeesNumber +=
+                accountFees.getChecking()
+                        .isEmpty() ? 0 : getTotalFees(accountFees.getChecking());
+        totalFeesNumber +=
+                accountFees.getFixedTerm()
+                        .isEmpty() ? 0 : getTotalFees(accountFees.getFixedTerm());
+        totalFeesNumber +=
+                accountFees.getSavingsVip()
+                        .isEmpty() ? 0 : getTotalFees(accountFees.getSavingsVip());
+        totalFeesNumber +=
+                accountFees.getCheckingPyme()
+                        .isEmpty() ? 0 : getTotalFees(accountFees.getCheckingPyme());
+        return totalFeesNumber;
+    }
+
+    /**
+     * Calcula el número total de comisiones para una lista específica de comisiones de cuenta.
+     * Este método suma el número de comisiones de cada cuenta en la lista.
+     *
+     * @param accountFeeList Lista de AccountFeeDto que contiene información de comisiones
+     * @return El conteo total de comisiones para las cuentas dadas
+     */
+    private int getTotalFees(List<AccountFeeDto> accountFeeList) {
+
+        return accountFeeList.stream()
+                .map(AccountFeeDto::getNumberOfFees)
+                .reduce(0, Integer::sum)
+                ;
     }
 }

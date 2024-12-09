@@ -37,12 +37,12 @@ paths:
           description: Client not found
         '400':
           description: Invalid input
-  /reports/commissions:
+  /reports/bank-fees:
     get:
       tags:
         - Report
-      summary: Get commissions report
-      operationId: getCommissionsReport
+      summary: Get bank fees report
+      operationId: getBankFeesReport
       parameters:
         - name: startDate
           in: query
@@ -62,7 +62,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CommissionReportDto'
+                $ref: '#/components/schemas/BankFeeReportDto'
         '400':
           description: Invalid date range
 components:
@@ -219,7 +219,7 @@ components:
           type: number
           description: Saldo del producto en la fecha especificada
 
-    CommissionReportDto:
+    BankFeeReportDto:
       type: object
       description: Reporte de comisiones cobradas por producto en un período
       properties:
@@ -231,67 +231,86 @@ components:
           type: string
           format: date
           description: Fecha final del período del reporte
-        commissions:
+        AccountFees:
           type: object
-          description: Agrupación de comisiones por tipo de producto
+          description: Agrupación de comisiones a cuentas bancarias
           properties:
-            accounts:
+            savings:
               type: array
-              description: Lista de comisiones de cuentas bancarias
+              description: Lista de comisiones a cuentas de ahorro
               items:
-                $ref: '#/components/schemas/ProductCommissionDto'
-            credits:
+                $ref: '#/components/schemas/AccountFeeDto'
+            checking:
               type: array
-              description: Lista de comisiones de productos crediticios
+              description: Lista de comisiones a cuentas corrientes
               items:
-                $ref: '#/components/schemas/ProductCommissionDto'
-        totalCommissionsAmount:
+                $ref: '#/components/schemas/AccountFeeDto'
+            fixedTerm:
+              type: array
+              description: comisiones a cuentas de plazo fijo
+              items:
+                $ref: '#/components/schemas/AccountFeeDto'
+            savingsVip:
+              type: array
+              description: Lista de comisiones a cuentas de ahorro VIP
+              items:
+                $ref: '#/components/schemas/AccountFeeDto'
+            checkingPyme:
+              type: array
+              description: Lista de comisiones a cuentas corrientes PYME
+              items:
+                $ref: '#/components/schemas/AccountFeeDto'
+        totalFeesAmount:
           type: number
           description: Monto total de comisiones cobradas en el período
-        totalProducts:
+        totalFeesNumber:
           type: integer
-          description: Número total de productos que generaron comisiones
+          description: Número total de comisiones
 
-    ProductCommissionDto:
+    AccountFeeDto:
       type: object
-      description: Detalle de comisiones cobradas a un producto específico
+      description: Detalle de comisiones cobradas a una cuenta bancaria
       properties:
-        productId:
+        accountId:
           type: string
           description: Identificador único del producto
-        productType:
+        accountType:
           type: string
-          description: Tipo de producto (cuenta o crédito)
+          enum: [SAVINGS, CHECKING, FIXED_TERM, SAVINGS_VIP, CHECKING_PYME]
+          description: Tipo de cuenta (Ahorro, Corriente, Plazo Fijo, AhorroVIP, CorrientePYME)
         customerId:
           type: string
           description: Identificador del cliente dueño del producto
         customerName:
           type: string
           description: Nombre del cliente dueño del producto
-        commissionDetails:
+        feeDetails:
           type: array
           description: Lista detallada de las comisiones cobradas
           items:
-            $ref: '#/components/schemas/CommissionDetailDto'
-        totalCommissions:
+            $ref: '#/components/schemas/FeeDetailDto'
+        numberOfFees:
+          type: integer
+          description: numero de comisiones cobradas
+        totalFees:
           type: number
           description: Suma total de comisiones cobradas al producto
 
-    CommissionDetailDto:
+    FeeDetailDto:
       type: object
       description: Detalle de una comisión específica
       properties:
+        operationType:
+          type: string
+          description: Tipo de operacion a la que se aplico comision
         date:
           type: string
           format: date
           description: Fecha en que se cobró la comisión
-        type:
+        feeType:
           type: string
           enum: [MAINTENANCE_FEE, TRANSACTION_EXCESS, LATE_PAYMENT]
           description: Tipo de comisión (mantenimiento, exceso de transacciones, pago tardío)
-        amount:
+        feeAmount:
           type: number
           description: Monto de la comisión cobrada
-        description:
-          type: string
-          description: Descripción detallada del motivo de la comisión

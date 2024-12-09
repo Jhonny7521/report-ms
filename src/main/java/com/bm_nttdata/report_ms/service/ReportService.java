@@ -1,6 +1,6 @@
 package com.bm_nttdata.report_ms.service;
 
-import com.bm_nttdata.report_ms.model.CommissionReportDto;
+import com.bm_nttdata.report_ms.model.BankFeeReportDto;
 import com.bm_nttdata.report_ms.model.DailyBalanceReportDto;
 import java.time.LocalDate;
 
@@ -22,13 +22,14 @@ public interface ReportService {
      */
     DailyBalanceReportDto generateDailyBalanceReport(String clientId, LocalDate month);
 
-//    /**
-//     * generateCommissionReport.
-//     *
-//     * @param startDate rr
-//     * @param endDate rr
-//     * @return rr
-//     */
-//    CommissionReportDto generateCommissionReport(LocalDate startDate, LocalDate endDate);
+    /**
+     * Genera un reporte de comisiones bancarias dentro de un pediodo de tiempo.
+     * El reporte incluye información detallada sobre las comisiones según los tipos de cuentas.
+     *
+     * @param startDate fecha de inicio de la busqueda
+     * @param endDate fecha de fin de la busqueda
+     * @return BankFeeReportDto Objeto que contiene el reporte completo de las comisiones bancarias
+     */
+    BankFeeReportDto getBankFeesReport(LocalDate startDate, LocalDate endDate);
 }
 

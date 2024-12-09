@@ -2,6 +2,7 @@ package com.bm_nttdata.report_ms.client;
 
 import com.bm_nttdata.report_ms.dto.AccountDto;
 import com.bm_nttdata.report_ms.model.DailyBalanceDto;
+import com.bm_nttdata.report_ms.model.FeeDetailDto;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -39,4 +40,30 @@ public interface AccountClient {
             @PathVariable("id") String id,
             @RequestParam(value = "searchMonth")
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate searchMonth);
+
+    /**
+     * Obtiene todas las cuentas bancarias en base al estatus.
+     *
+     * @param status estatus de cuentas a buscar
+     * @return lista de cuentas bancarias que cumplen los criterios de busqueda
+     */
+    @GetMapping("/accounts/by-status")
+    List<AccountDto> getActiveAccounts(
+            @RequestParam(value = "status") String status);
+
+    /**
+     * Obtiene todas las comisiones cobradas a cuentas bancarias en un pediodo de tiempo.
+     *
+     * @param id identificador único de la cuenta bancaria
+     * @param startDate Fecha inicial del periodo de búsqueda
+     * @param endDate Fecha final del periodo de búsqueda
+     * @return lista de comisiones encontradas en el periodo de busqueda
+     */
+    @GetMapping("/accounts/{id}/fees")
+    List<FeeDetailDto> getAllAccountFees(
+            @PathVariable("id") String id,
+            @RequestParam(value = "startDate")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate);
 }

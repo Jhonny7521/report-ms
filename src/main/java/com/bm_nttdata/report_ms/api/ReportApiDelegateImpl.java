@@ -1,6 +1,6 @@
 package com.bm_nttdata.report_ms.api;
 
-import com.bm_nttdata.report_ms.model.CommissionReportDto;
+import com.bm_nttdata.report_ms.model.BankFeeReportDto;
 import com.bm_nttdata.report_ms.model.DailyBalanceReportDto;
 import com.bm_nttdata.report_ms.service.ReportService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -29,6 +29,14 @@ public class ReportApiDelegateImpl implements ReportApiDelegate {
         log.info("Getting average balances for client {} for month {}", customerId, month);
         DailyBalanceReportDto report = reportService.generateDailyBalanceReport(customerId, month);
         return ResponseEntity.ok(report);
+    }
+
+    @Override
+    public ResponseEntity<BankFeeReportDto> getBankFeesReport(
+            LocalDate startDate, LocalDate endDate) {
+        log.info("Getting fees charged from {} to {}", startDate, endDate);
+        BankFeeReportDto bankFeeReport = reportService.getBankFeesReport(startDate, endDate);
+        return ResponseEntity.ok(bankFeeReport);
     }
 
     // Fallback methods for circuit breaker
